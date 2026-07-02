@@ -1,0 +1,17 @@
+*.iml
+.gradle
+.idea
+.agents
+build
+local.properties
+captures
+.externalNativeBuild
+.cxx
+.kotlin
+**/build
+**/out
+*.apk
+*.aab
+*.keystore
+*.jks
+_wrapper_scan.txt
