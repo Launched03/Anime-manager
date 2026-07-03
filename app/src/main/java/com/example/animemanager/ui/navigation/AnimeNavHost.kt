@@ -25,6 +25,7 @@ import com.example.animemanager.feature.calendar.CalendarRoute
 import com.example.animemanager.feature.detail.DetailRoute
 import com.example.animemanager.feature.edit.EditRoute
 import com.example.animemanager.feature.home.HomeRoute
+import com.example.animemanager.feature.home.HomeSearchRoute
 import com.example.animemanager.feature.library.LibraryRoute
 import com.example.animemanager.feature.profile.ProfileRoute
 import com.example.animemanager.feature.profile.SettingsRoute
@@ -69,6 +70,12 @@ fun AnimeNavHost(
                 HomeRoute(
                     onOpenAnime = { navController.navigate(AnimeRoutes.detailRoute(it)) },
                     onAddAnime = { navController.navigate(AnimeRoutes.Edit) },
+                    onOpenSearch = { navController.navigate(AnimeRoutes.HomeSearch) },
+                )
+            }
+            composable(AnimeRoutes.HomeSearch) {
+                HomeSearchRoute(
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable(AnimeRoutes.Library) {

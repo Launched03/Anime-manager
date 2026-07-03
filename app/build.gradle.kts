@@ -109,6 +109,13 @@ android {
         debug {
             isMinifyEnabled = false
         }
+        create("releaseLike") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            isMinifyEnabled = false
+        }
     }
 
     compileOptions {

@@ -10,6 +10,7 @@ import android.net.Uri
 import android.webkit.MimeTypeMap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,10 +49,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -65,7 +73,9 @@ import com.example.animemanager.core.model.buildMinuteOfDay
 import com.example.animemanager.core.model.splitMinuteOfDay
 import com.example.animemanager.core.ui.AnimeChoiceChipRow
 import com.example.animemanager.core.ui.AnimePosterImage
+import com.example.animemanager.core.ui.AnimeSearchField
 import com.example.animemanager.core.ui.AnimeTopBar
+import com.example.animemanager.core.ui.clearFocusOnTapOutside
 import java.io.File
 import java.io.FileOutputStream
 
@@ -188,6 +198,15 @@ fun EditScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            uiState.saveError?.let { message ->
+                item {
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     AnimePosterImage(
@@ -345,25 +364,62 @@ private fun BangumiSearchDialog(
     onDismiss: () -> Unit,
     onImport: (RemoteAnimeSearchResult) -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var contentBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+    var queryBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+    var yearBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+    val clearSearchFocus: () -> Unit = {
+        focusManager.clearFocus(force = true)
+        keyboardController?.hide()
+    }
+    val search: () -> Unit = {
+        clearSearchFocus()
+        onSearch()
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Bangumi 在线搜索") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = uiState.remoteSearchQuery,
-                    onValueChange = onQueryChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("番剧名") },
-                    singleLine = true,
+            Column(
+                modifier = Modifier
+                    .onGloballyPositioned { coordinates ->
+                        contentBoundsInRoot = coordinates.boundsInRoot()
+                    }
+                    .clearFocusOnTapOutside(
+                        excludedBoundsInRoot = listOfNotNull(queryBoundsInRoot, yearBoundsInRoot),
+                        containerBoundsInRoot = contentBoundsInRoot,
+                        onOutsideTap = clearSearchFocus,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                AnimeSearchField(
+                    query = uiState.remoteSearchQuery,
+                    onQueryChange = onQueryChange,
+                    onSearch = search,
+                    label = "番剧名",
+                    placeholder = "搜索 Bangumi 番剧",
+                    loading = uiState.remoteSearchLoading,
+                    modifier = Modifier.onGloballyPositioned { coordinates ->
+                        queryBoundsInRoot = coordinates.boundsInRoot()
+                    },
                 )
                 OutlinedTextField(
                     value = uiState.remoteSearchYear,
                     onValueChange = onYearChange,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { coordinates ->
+                            yearBoundsInRoot = coordinates.boundsInRoot()
+                        },
                     label = { Text("年份，可选") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Search,
+                    ),
+                    keyboardActions = KeyboardActions(onSearch = { search() }),
                 )
                 AnimeChoiceChipRow(
                     options = listOf<BangumiSeasonFilter?>(null) + BangumiSeasonFilter.entries,
@@ -401,7 +457,7 @@ private fun BangumiSearchDialog(
         },
         confirmButton = {
             OutlinedButton(
-                onClick = onSearch,
+                onClick = search,
                 enabled = !uiState.remoteSearchLoading,
             ) {
                 Text("搜索")

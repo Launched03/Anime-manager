@@ -6,6 +6,7 @@ import com.example.animemanager.core.data.remote.BangumiSeasonFilter
 import com.example.animemanager.core.data.remote.RemoteAnimeDataSource
 import com.example.animemanager.core.data.remote.RemoteAnimeSearchResult
 import com.example.animemanager.core.data.repository.AnimeRepository
+import com.example.animemanager.core.data.repository.DuplicateAnimeException
 import com.example.animemanager.core.model.AnimeDetail
 import com.example.animemanager.core.model.AnimeForm
 import com.example.animemanager.core.model.SeriesStatus
@@ -24,6 +25,7 @@ data class EditUiState(
     val form: AnimeForm = AnimeForm(),
     val loading: Boolean = false,
     val savedAnimeId: Long? = null,
+    val saveError: String? = null,
     val remoteSearchQuery: String = "",
     val remoteSearchYear: String = "",
     val remoteSearchSeason: BangumiSeasonFilter? = null,
@@ -54,6 +56,7 @@ class EditViewModel @Inject constructor(
                     form = anime?.toForm() ?: AnimeForm(id = animeId),
                     loading = false,
                     savedAnimeId = null,
+                    saveError = null,
                 )
             }
         }
@@ -150,6 +153,7 @@ class EditViewModel @Inject constructor(
             current.copy(
                 form = result.mergeInto(current.form),
                 remoteSearchError = null,
+                saveError = null,
             )
         }
     }
@@ -157,16 +161,31 @@ class EditViewModel @Inject constructor(
     fun save() {
         viewModelScope.launch {
             if (state.value.form.title.isBlank()) {
+                state.update { it.copy(saveError = "请输入番剧标题。") }
                 return@launch
             }
             state.update { it.copy(loading = true) }
-            val savedId = repository.upsertAnime(state.value.form)
-            state.update {
-                it.copy(
-                    loading = false,
-                    savedAnimeId = savedId,
-                    form = it.form.copy(id = savedId),
-                )
+            runCatching {
+                repository.upsertAnime(state.value.form)
+            }.onSuccess { savedId ->
+                state.update {
+                    it.copy(
+                        loading = false,
+                        savedAnimeId = savedId,
+                        saveError = null,
+                        form = it.form.copy(id = savedId),
+                    )
+                }
+            }.onFailure { error ->
+                state.update {
+                    it.copy(
+                        loading = false,
+                        saveError = when (error) {
+                            is DuplicateAnimeException -> "《${error.existingTitle}》已经在库中，不能重复添加。"
+                            else -> error.message ?: "保存失败，请稍后再试。"
+                        },
+                    )
+                }
             }
         }
     }
@@ -176,12 +195,13 @@ class EditViewModel @Inject constructor(
     }
 
     private fun mutateForm(block: AnimeForm.() -> AnimeForm) {
-        state.update { current -> current.copy(form = current.form.block()) }
+        state.update { current -> current.copy(form = current.form.block(), saveError = null) }
     }
 
     private fun AnimeDetail.toForm(): AnimeForm {
         return AnimeForm(
             id = id,
+            sourceId = sourceId,
             title = title,
             originalTitle = originalTitle,
             posterRef = posterRef,

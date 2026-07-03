@@ -4,7 +4,9 @@ package com.example.animemanager.core.ui
 
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,32 +23,56 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.lazy.rememberLazyListState
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import coil.size.Precision
+import coil.size.Scale
 import com.example.animemanager.core.model.AnimeSummary
 import com.example.animemanager.core.model.SeriesStatus
 import com.example.animemanager.core.model.WatchState
@@ -94,6 +120,106 @@ fun AnimeTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 content = actions,
             )
+        }
+    }
+}
+
+@Composable
+fun AnimeSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    modifier: Modifier = Modifier,
+    label: String = "搜索",
+    placeholder: String? = null,
+    loading: Boolean = false,
+    focusRequester: FocusRequester? = null,
+    showSearchButton: Boolean = false,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        var textFieldModifier = if (showSearchButton) Modifier.weight(1f) else Modifier.fillMaxWidth()
+        if (focusRequester != null) {
+            textFieldModifier = textFieldModifier.focusRequester(focusRequester)
+        }
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = textFieldModifier,
+            label = { Text(label) },
+            placeholder = placeholder?.let { text -> { Text(text) } },
+            singleLine = true,
+            leadingIcon = if (showSearchButton) {
+                null
+            } else {
+                {
+                    Icon(imageVector = Icons.Filled.Search, contentDescription = null)
+                }
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = {
+                if (!loading) {
+                    onSearch()
+                }
+            }),
+            trailingIcon = if (query.isNotBlank()) {
+                {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(imageVector = Icons.Filled.Close, contentDescription = "清空")
+                    }
+                }
+            } else {
+                null
+            },
+        )
+        if (showSearchButton) {
+            IconButton(
+                onClick = onSearch,
+                enabled = !loading,
+            ) {
+                Icon(imageVector = Icons.Filled.Search, contentDescription = "搜索")
+            }
+        }
+    }
+}
+
+fun Modifier.clearFocusOnTouchDown(
+    onTouchDown: () -> Unit,
+): Modifier {
+    return pointerInput(onTouchDown) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (event.changes.any { it.changedToDownIgnoreConsumed() }) {
+                    onTouchDown()
+                }
+            }
+        }
+    }
+}
+
+fun Modifier.clearFocusOnTapOutside(
+    excludedBoundsInRoot: List<Rect>,
+    containerBoundsInRoot: Rect?,
+    onOutsideTap: () -> Unit,
+): Modifier {
+    return pointerInput(excludedBoundsInRoot, containerBoundsInRoot, onOutsideTap) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val down = event.changes.firstOrNull { it.changedToDownIgnoreConsumed() } ?: continue
+                val containerBounds = containerBoundsInRoot ?: continue
+                val rootPosition = Offset(
+                    x = containerBounds.left + down.position.x,
+                    y = containerBounds.top + down.position.y,
+                )
+                if (excludedBoundsInRoot.none { it.contains(rootPosition) }) {
+                    onOutsideTap()
+                }
+            }
         }
     }
 }
@@ -150,29 +276,45 @@ fun AnimePosterImage(
     posterRef: String?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
+    decodeSize: DpSize? = null,
+    fastThumbnail: Boolean = false,
+    showMissingIcon: Boolean = true,
 ) {
     val context = LocalContext.current
-    val model = remember(posterRef) {
-        posterRef?.trim()?.takeIf { it.isNotBlank() }?.let { value ->
-            when {
-                value.startsWith("http://", ignoreCase = true) || value.startsWith("https://", ignoreCase = true) -> value
-                value.startsWith("content://", ignoreCase = true) || value.startsWith("file://", ignoreCase = true) -> Uri.parse(value)
-                value.startsWith("/") -> java.io.File(value)
-                else -> value
-            }
+    val density = LocalDensity.current
+    val model = rememberAnimeImageModel(posterRef)
+    val shape = RoundedCornerShape(8.dp)
+    val backgroundColor = MaterialTheme.colorScheme.surfaceVariant
+    val requestSize = decodeSize?.let { size ->
+        with(density) {
+            size.width.roundToPx().coerceAtLeast(1) to size.height.roundToPx().coerceAtLeast(1)
+        }
+    }
+    val imageRequest = remember(context, model, requestSize, fastThumbnail, contentScale) {
+        model?.let { value ->
+            ImageRequest.Builder(context)
+                .data(value)
+                .crossfade(false)
+                .apply {
+                    requestSize?.let { (width, height) -> size(width, height) }
+                    if (fastThumbnail) {
+                        precision(Precision.INEXACT)
+                        scale(if (contentScale == ContentScale.Fit) Scale.FIT else Scale.FILL)
+                        allowRgb565(true)
+                    }
+                }
+                .build()
         }
     }
 
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(backgroundColor),
+        contentAlignment = Alignment.Center,
     ) {
         if (model == null) {
-            Box(
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
+            if (showMissingIcon) {
                 Icon(
                     imageVector = Icons.Filled.BrokenImage,
                     contentDescription = null,
@@ -182,11 +324,67 @@ fun AnimePosterImage(
             }
         } else {
             AsyncImage(
-                model = ImageRequest.Builder(context).data(model).crossfade(false).build(),
+                model = imageRequest,
                 contentDescription = null,
                 contentScale = contentScale,
+                filterQuality = if (fastThumbnail) FilterQuality.Low else FilterQuality.Medium,
                 modifier = Modifier.fillMaxSize(),
             )
+        }
+    }
+}
+
+@Composable
+fun AnimeAdaptiveImage(
+    posterRef: String?,
+    modifier: Modifier = Modifier,
+    minAspectRatio: Float = 0.56f,
+    maxAspectRatio: Float = 2.2f,
+) {
+    val context = LocalContext.current
+    val model = rememberAnimeImageModel(posterRef)
+    var aspectRatio by remember(model) { mutableStateOf(2f / 3f) }
+
+    if (model == null) {
+        AnimePosterImage(
+            posterRef = null,
+            modifier = modifier
+                .fillMaxWidth()
+                .aspectRatio(aspectRatio),
+            contentScale = ContentScale.Fit,
+        )
+    } else {
+        AsyncImage(
+            model = ImageRequest.Builder(context).data(model).crossfade(false).build(),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            onSuccess = { state ->
+                val drawable = state.result.drawable
+                val width = drawable.intrinsicWidth
+                val height = drawable.intrinsicHeight
+                if (width > 0 && height > 0) {
+                    aspectRatio = (width.toFloat() / height.toFloat())
+                        .coerceIn(minAspectRatio, maxAspectRatio)
+                }
+            },
+            modifier = modifier
+                .fillMaxWidth()
+                .aspectRatio(aspectRatio)
+                .clip(RoundedCornerShape(8.dp)),
+        )
+    }
+}
+
+@Composable
+private fun rememberAnimeImageModel(posterRef: String?): Any? {
+    return remember(posterRef) {
+        posterRef?.trim()?.takeIf { it.isNotBlank() }?.let { value ->
+            when {
+                value.startsWith("http://", ignoreCase = true) || value.startsWith("https://", ignoreCase = true) -> value
+                value.startsWith("content://", ignoreCase = true) || value.startsWith("file://", ignoreCase = true) -> Uri.parse(value)
+                value.startsWith("/") -> java.io.File(value)
+                else -> value
+            }
         }
     }
 }
@@ -216,6 +414,28 @@ fun AnimePosterListItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val posterDecodeSize = remember { DpSize(72.dp, 96.dp) }
+    val seasonText = remember(summary.seasonYear, summary.seasonName) {
+        seasonLabel(summary.seasonYear, summary.seasonName)
+    }
+    val progressText = remember(summary.watchState, summary.progressEpisode, summary.totalEpisodes) {
+        animeListProgressLabel(summary)
+    }
+    val scheduleText = remember(summary.seriesStatus, summary.releaseWeekday, summary.releaseMinuteOfDay) {
+        if (summary.seriesStatus == SeriesStatus.FINISHED) {
+            null
+        } else {
+            scheduleLabel(summary.releaseWeekday, summary.releaseMinuteOfDay)
+        }
+    }
+    val tags = remember(summary.seriesStatus, summary.watchState, summary.isFavorite) {
+        buildList {
+            add(summary.seriesStatus.displayLabel())
+            summary.watchState?.let { add(it.displayLabel()) }
+            if (summary.isFavorite) add("收藏")
+        }
+    }
+
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -231,9 +451,8 @@ fun AnimePosterListItem(
         ) {
             AnimePosterImage(
                 posterRef = summary.posterRef,
-                modifier = Modifier
-                    .size(width = 72.dp, height = 96.dp)
-                    .clip(RoundedCornerShape(8.dp)),
+                modifier = Modifier.size(width = 72.dp, height = 96.dp),
+                decodeSize = posterDecodeSize,
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -253,40 +472,52 @@ fun AnimePosterListItem(
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = seasonLabel(summary.seasonYear, summary.seasonName),
+                    text = seasonText,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                animeListProgressLabel(summary)?.let { progressText ->
+                progressText?.let { text ->
                     Text(
-                        text = progressText,
+                        text = text,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (summary.seriesStatus != SeriesStatus.FINISHED) {
+                scheduleText?.let { text ->
                     Text(
-                        text = scheduleLabel(summary.releaseWeekday, summary.releaseMinuteOfDay),
+                        text = text,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                FlowRow(
+                Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    AssistChip(onClick = {}, label = { Text(summary.seriesStatus.displayLabel()) })
-                    summary.watchState?.let {
-                        AssistChip(onClick = {}, label = { Text(it.displayLabel()) })
-                    }
-                    if (summary.isFavorite) {
-                        AssistChip(onClick = {}, label = { Text("收藏") })
-                    }
+                    tags.forEach { tag -> AnimeListTag(text = tag) }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun AnimeListTag(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 private fun animeListProgressLabel(summary: AnimeSummary): String? {
@@ -330,24 +561,22 @@ fun AnimeWatchStateChips(
     selected: WatchState?,
     onSelect: (WatchState?) -> Unit,
     modifier: Modifier = Modifier,
+    wrapContent: Boolean = false,
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    AnimeFilterChipContainer(
+        modifier = modifier,
+        wrapContent = wrapContent,
     ) {
-        FilterChip(
+        AnimeFilterChip(
             selected = selected == null,
             onClick = { onSelect(null) },
-            label = { Text("全部") },
+            text = "全部",
         )
         WatchState.entries.forEach { state ->
-            FilterChip(
+            AnimeFilterChip(
                 selected = selected == state,
                 onClick = { onSelect(state) },
-                label = { Text(state.displayLabel()) },
+                text = state.displayLabel(),
             )
         }
     }
@@ -358,20 +587,18 @@ fun AnimeSeriesStatusChips(
     selected: SeriesStatus?,
     onSelect: (SeriesStatus?) -> Unit,
     modifier: Modifier = Modifier,
+    wrapContent: Boolean = false,
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    AnimeFilterChipContainer(
+        modifier = modifier,
+        wrapContent = wrapContent,
     ) {
-        FilterChip(selected = selected == null, onClick = { onSelect(null) }, label = { Text("全部") })
+        AnimeFilterChip(selected = selected == null, onClick = { onSelect(null) }, text = "全部")
         SeriesStatus.entries.forEach { status ->
-            FilterChip(
+            AnimeFilterChip(
                 selected = selected == status,
                 onClick = { onSelect(status) },
-                label = { Text(status.displayLabel()) },
+                text = status.displayLabel(),
             )
         }
     }
@@ -382,23 +609,73 @@ fun AnimeWeekdayChips(
     selectedWeekday: Int?,
     onSelect: (Int?) -> Unit,
     modifier: Modifier = Modifier,
+    includeAll: Boolean = true,
+    initialVisibleWeekday: Int? = null,
+    wrapContent: Boolean = false,
 ) {
-    Row(
+    if (wrapContent) {
+        AnimeFilterChipContainer(
+            modifier = modifier,
+            wrapContent = true,
+        ) {
+            if (includeAll) {
+                AnimeFilterChip(
+                    selected = selectedWeekday == null,
+                    onClick = { onSelect(null) },
+                    text = "全部",
+                )
+            }
+            WeekdayChipValues.forEach { weekday ->
+                AnimeFilterChip(
+                    selected = selectedWeekday == weekday,
+                    onClick = { onSelect(weekday) },
+                    text = weekdayLabel(weekday),
+                )
+            }
+        }
+        return
+    }
+
+    val initialIndex = remember(includeAll, initialVisibleWeekday) {
+        initialWeekdayChipIndex(
+            weekday = initialVisibleWeekday,
+            includeAll = includeAll,
+        )
+    }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
+
+    LazyRow(
+        state = listState,
         modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
+            .fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FilterChip(selected = selectedWeekday == null, onClick = { onSelect(null) }, label = { Text("全部") })
-        for (weekday in 1..7) {
-            FilterChip(
+        if (includeAll) {
+            item(key = "all") {
+                AnimeFilterChip(
+                    selected = selectedWeekday == null,
+                    onClick = { onSelect(null) },
+                    text = "全部",
+                )
+            }
+        }
+        items(WeekdayChipValues, key = { it }) { weekday ->
+            AnimeFilterChip(
                 selected = selectedWeekday == weekday,
                 onClick = { onSelect(weekday) },
-                label = { Text(weekdayLabel(weekday)) },
+                text = weekdayLabel(weekday),
             )
         }
     }
+}
+
+private fun initialWeekdayChipIndex(
+    weekday: Int?,
+    includeAll: Boolean,
+): Int {
+    val selected = weekday?.coerceIn(1, 7) ?: return 0
+    return if (includeAll) selected else selected - 1
 }
 
 @Composable
@@ -408,22 +685,80 @@ fun <T> AnimeChoiceChipRow(
     onSelect: (T) -> Unit,
     label: (T) -> String,
     modifier: Modifier = Modifier,
+    wrapContent: Boolean = false,
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    AnimeFilterChipContainer(
+        modifier = modifier,
+        wrapContent = wrapContent,
     ) {
         options.forEach { option ->
-            FilterChip(
+            AnimeFilterChip(
                 selected = option == selected,
                 onClick = { onSelect(option) },
-                label = { Text(label(option)) },
+                text = label(option),
             )
         }
     }
+}
+
+private val WeekdayChipValues = (1..7).toList()
+
+@Composable
+private fun AnimeFilterChipContainer(
+    modifier: Modifier = Modifier,
+    wrapContent: Boolean,
+    content: @Composable () -> Unit,
+) {
+    if (wrapContent) {
+        FlowRow(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            content = { content() },
+        )
+    } else {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = { content() },
+        )
+    }
+}
+
+@Composable
+private fun AnimeFilterChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(18.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val backgroundColor = if (selected) colorScheme.primaryContainer else colorScheme.surfaceVariant
+    val contentColor = if (selected) colorScheme.onPrimaryContainer else colorScheme.onSurfaceVariant
+    val borderColor = if (selected) colorScheme.primary else colorScheme.outlineVariant
+
+    Text(
+        text = text,
+        modifier = modifier
+            .clip(shape)
+            .background(backgroundColor)
+            .border(width = 1.dp, color = borderColor, shape = shape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        style = MaterialTheme.typography.labelLarge,
+        color = contentColor,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable

@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 data class AnimeEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    val sourceId: String? = null,
     val title: String,
     val originalTitle: String? = null,
     val posterRef: String? = null,

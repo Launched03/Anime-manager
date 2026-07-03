@@ -4,25 +4,32 @@ package com.example.animemanager.feature.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.animemanager.core.model.HomeDashboard
 import com.example.animemanager.core.ui.AnimeEmptyState
 import com.example.animemanager.core.ui.AnimePosterListItem
@@ -33,6 +40,7 @@ import com.example.animemanager.core.ui.AnimeTopBar
 fun HomeRoute(
     onOpenAnime: (Long) -> Unit,
     onAddAnime: () -> Unit,
+    onOpenSearch: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -40,6 +48,7 @@ fun HomeRoute(
         dashboard = uiState.dashboard,
         onOpenAnime = onOpenAnime,
         onAddAnime = onAddAnime,
+        onOpenSearch = onOpenSearch,
     )
 }
 
@@ -48,6 +57,7 @@ fun HomeScreen(
     dashboard: HomeDashboard,
     onOpenAnime: (Long) -> Unit,
     onAddAnime: () -> Unit,
+    onOpenSearch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -64,45 +74,75 @@ fun HomeScreen(
             )
         },
     ) { innerPadding ->
-        val sections = listOf(
-            "今日更新" to dashboard.todayUpdates,
-            "继续追番" to dashboard.continueWatching,
-            "收藏夹" to dashboard.favorites,
-            "最近添加" to dashboard.recentlyAdded,
-        )
-        if (sections.all { it.second.isEmpty() }) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                AnimeEmptyState(
-                    title = "还没有番剧",
-                    subtitle = "先添加一部番剧吧",
-                )
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                HomeSearchEntry(onClick = onOpenSearch)
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                sections.forEach { (title, sectionItems) ->
-                    if (sectionItems.isNotEmpty()) {
-                        item(key = "${title}_header") {
-                            AnimeSectionHeader(title = title)
-                        }
-                        items(sectionItems, key = { summary -> "${title}_${summary.id}" }) { summary ->
-                            AnimePosterListItem(
-                                summary = summary,
-                                onClick = { onOpenAnime(summary.id) },
-                            )
-                        }
+
+            if (dashboard.favorites.isNotEmpty()) {
+                item(key = "favorites_header") {
+                    AnimeSectionHeader(title = "收藏夹")
+                }
+                items(dashboard.favorites, key = { summary -> "favorite_${summary.id}" }) { summary ->
+                    AnimePosterListItem(
+                        summary = summary,
+                        onClick = { onOpenAnime(summary.id) },
+                    )
+                }
+            } else {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        AnimeEmptyState(
+                            title = "还没有收藏番剧",
+                            subtitle = "可以先在线搜索添加，或在详情页点收藏",
+                        )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeSearchEntry(
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "在线搜索",
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "番剧名 / 2024 / 2024 春季",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }

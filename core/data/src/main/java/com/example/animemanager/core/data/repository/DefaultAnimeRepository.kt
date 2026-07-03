@@ -92,10 +92,13 @@ class DefaultAnimeRepository @Inject constructor(
     }
 
     override suspend fun upsertAnime(form: AnimeForm): Long {
+        ensureNoDuplicate(form)
         val now = System.currentTimeMillis()
+        val sourceId = form.sourceId?.trim().takeUnless { it.isNullOrBlank() }
         val animeId = animeDao.upsertAnime(
             AnimeEntity(
                 id = form.id,
+                sourceId = sourceId,
                 title = form.title.trim(),
                 originalTitle = form.originalTitle?.trim().takeUnless { it.isNullOrBlank() },
                 posterRef = form.posterRef?.trim().takeUnless { it.isNullOrBlank() },
@@ -212,6 +215,7 @@ class DefaultAnimeRepository @Inject constructor(
     private fun AnimeRow.toSummary(): AnimeSummary {
         return AnimeSummary(
             id = animeId,
+            sourceId = sourceId,
             title = title,
             originalTitle = originalTitle,
             posterRef = posterRef,
@@ -227,12 +231,15 @@ class DefaultAnimeRepository @Inject constructor(
             releaseWeekday = releaseWeekday,
             releaseMinuteOfDay = releaseMinuteOfDay,
             scheduleActive = scheduleActive,
+            createdAt = createdAt,
+            updatedAt = updatedAt,
         )
     }
 
     private fun AnimeRow.toDetail(): AnimeDetail {
         return AnimeDetail(
             id = animeId,
+            sourceId = sourceId,
             title = title,
             originalTitle = originalTitle,
             posterRef = posterRef,
@@ -263,6 +270,40 @@ class DefaultAnimeRepository @Inject constructor(
                 .thenBy { it.releaseMinuteOfDay ?: Int.MAX_VALUE }
                 .thenBy(String.CASE_INSENSITIVE_ORDER) { it.title }
             AnimeSortOrder.STATUS_THEN_TITLE -> compareBy<AnimeSummary> { it.seriesStatus.dbValue }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.title }
+            AnimeSortOrder.ADDED_DESC -> compareByDescending<AnimeSummary> { it.addedSortTime() }
+                .thenByDescending { it.id }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.title }
         }
     }
+
+    private fun AnimeSummary.addedSortTime(): Long {
+        return when {
+            createdAt > 0L -> createdAt
+            updatedAt > 0L -> updatedAt
+            else -> id
+        }
+    }
+
+    private suspend fun ensureNoDuplicate(form: AnimeForm) {
+        val excludeId = form.id
+        val sourceId = form.sourceId?.trim().takeUnless { it.isNullOrBlank() }
+        val duplicateBySource = sourceId?.let { animeDao.getAnimeEntityBySourceId(it, excludeId) }
+        if (duplicateBySource != null) {
+            throw DuplicateAnimeException(duplicateBySource.id, duplicateBySource.title)
+        }
+
+        val normalizedNames = listOfNotNull(form.title, form.originalTitle)
+            .map { it.normalizedAnimeName() }
+            .filter { it.isNotBlank() }
+            .distinct()
+
+        for (name in normalizedNames) {
+            val duplicateByName = animeDao.getAnimeEntityByNormalizedName(name, excludeId)
+            if (duplicateByName != null) {
+                throw DuplicateAnimeException(duplicateByName.id, duplicateByName.title)
+            }
+        }
+    }
+
+    private fun String.normalizedAnimeName(): String = trim().lowercase()
 }

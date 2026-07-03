@@ -38,13 +38,15 @@ enum class AnimeSortOrder(val dbValue: Int) {
     TITLE_ASC(0),
     UPDATED_DESC(1),
     NEXT_UPDATE_ASC(2),
-    STATUS_THEN_TITLE(3);
+    STATUS_THEN_TITLE(3),
+    ADDED_DESC(4);
 
     fun displayLabel(): String = when (this) {
         TITLE_ASC -> "名称"
         UPDATED_DESC -> "最近更新"
         NEXT_UPDATE_ASC -> "下次更新"
         STATUS_THEN_TITLE -> "状态优先"
+        ADDED_DESC -> "添加时间"
     }
 
     companion object {

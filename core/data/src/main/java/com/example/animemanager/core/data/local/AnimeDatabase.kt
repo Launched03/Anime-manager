@@ -9,7 +9,7 @@ import com.example.animemanager.core.data.local.entity.UserAnimeStateEntity
 
 @Database(
     entities = [AnimeEntity::class, AnimeScheduleEntity::class, UserAnimeStateEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class AnimeDatabase : RoomDatabase() {

@@ -28,6 +28,7 @@ data class RemoteAnimeSearchResult(
 ) {
     fun mergeInto(form: AnimeForm): AnimeForm {
         return form.copy(
+            sourceId = sourceId,
             title = title.ifBlank { form.title },
             originalTitle = originalTitle ?: form.originalTitle,
             posterRef = posterRef ?: form.posterRef,
@@ -48,5 +49,6 @@ interface RemoteAnimeDataSource {
         year: Int?,
         season: BangumiSeasonFilter?,
         limit: Int = 20,
+        offset: Int = 0,
     ): List<RemoteAnimeSearchResult>
 }

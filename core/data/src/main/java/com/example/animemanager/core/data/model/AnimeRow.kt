@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 
 data class AnimeRow(
     @ColumnInfo(name = "animeId") val animeId: Long,
+    @ColumnInfo(name = "sourceId") val sourceId: String?,
     @ColumnInfo(name = "title") val title: String,
     @ColumnInfo(name = "originalTitle") val originalTitle: String?,
     @ColumnInfo(name = "posterRef") val posterRef: String?,

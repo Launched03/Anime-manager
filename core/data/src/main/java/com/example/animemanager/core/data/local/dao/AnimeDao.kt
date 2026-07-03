@@ -18,6 +18,7 @@ interface AnimeDao {
         """
         SELECT
             a.id AS animeId,
+            a.sourceId AS sourceId,
             a.title AS title,
             a.originalTitle AS originalTitle,
             a.posterRef AS posterRef,
@@ -63,6 +64,7 @@ interface AnimeDao {
         """
         SELECT
             a.id AS animeId,
+            a.sourceId AS sourceId,
             a.title AS title,
             a.originalTitle AS originalTitle,
             a.posterRef AS posterRef,
@@ -98,6 +100,7 @@ interface AnimeDao {
         """
         SELECT
             a.id AS animeId,
+            a.sourceId AS sourceId,
             a.title AS title,
             a.originalTitle AS originalTitle,
             a.posterRef AS posterRef,
@@ -150,6 +153,22 @@ interface AnimeDao {
 
     @Query("SELECT * FROM anime WHERE id = :animeId LIMIT 1")
     suspend fun getAnimeEntity(animeId: Long): AnimeEntity?
+
+    @Query("SELECT * FROM anime WHERE id != :excludeId AND sourceId = :sourceId LIMIT 1")
+    suspend fun getAnimeEntityBySourceId(sourceId: String, excludeId: Long): AnimeEntity?
+
+    @Query(
+        """
+        SELECT * FROM anime
+        WHERE id != :excludeId
+            AND (
+                LOWER(TRIM(title)) = :normalizedName
+                OR LOWER(TRIM(COALESCE(originalTitle, ''))) = :normalizedName
+            )
+        LIMIT 1
+        """
+    )
+    suspend fun getAnimeEntityByNormalizedName(normalizedName: String, excludeId: Long): AnimeEntity?
 
     @Query("SELECT * FROM user_anime_state WHERE anime_id = :animeId LIMIT 1")
     suspend fun getStateEntity(animeId: Long): UserAnimeStateEntity?

@@ -22,9 +22,10 @@ class BangumiRemoteAnimeDataSource @Inject constructor() : RemoteAnimeDataSource
         year: Int?,
         season: BangumiSeasonFilter?,
         limit: Int,
+        offset: Int,
     ): List<RemoteAnimeSearchResult> = withContext(Dispatchers.IO) {
         val body = buildSearchBody(keyword = keyword, year = year, season = season)
-        val url = URL("$BASE_URL/v0/search/subjects?limit=${limit.coerceIn(1, 50)}&offset=0")
+        val url = URL("$BASE_URL/v0/search/subjects?limit=${limit.coerceIn(1, 50)}&offset=${offset.coerceAtLeast(0)}")
         val connection = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 15_000

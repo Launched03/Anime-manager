@@ -2,6 +2,7 @@ package com.example.animemanager.core.model
 
 data class AnimeSummary(
     val id: Long = 0,
+    val sourceId: String? = null,
     val title: String = "",
     val originalTitle: String? = null,
     val posterRef: String? = null,
@@ -17,10 +18,13 @@ data class AnimeSummary(
     val releaseWeekday: Int? = null,
     val releaseMinuteOfDay: Int? = null,
     val scheduleActive: Boolean = false,
+    val createdAt: Long = 0,
+    val updatedAt: Long = 0,
 )
 
 data class AnimeDetail(
     val id: Long = 0,
+    val sourceId: String? = null,
     val title: String = "",
     val originalTitle: String? = null,
     val posterRef: String? = null,
@@ -44,6 +48,7 @@ data class AnimeDetail(
 
 data class AnimeForm(
     val id: Long = 0,
+    val sourceId: String? = null,
     val title: String = "",
     val originalTitle: String? = null,
     val posterRef: String? = null,

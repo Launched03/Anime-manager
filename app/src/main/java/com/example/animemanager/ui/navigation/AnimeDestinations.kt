@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 object AnimeRoutes {
     const val Home = "home"
+    const val HomeSearch = "home_search"
     const val Library = "library"
     const val Calendar = "calendar"
     const val Profile = "profile"

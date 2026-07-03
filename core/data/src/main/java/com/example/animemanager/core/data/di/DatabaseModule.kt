@@ -22,11 +22,17 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE anime ADD COLUMN sourceId TEXT")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideAnimeDatabase(@ApplicationContext context: Context): AnimeDatabase {
         return Room.databaseBuilder(context, AnimeDatabase::class.java, "anime_manager.db")
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .fallbackToDestructiveMigration()
             .build()
     }

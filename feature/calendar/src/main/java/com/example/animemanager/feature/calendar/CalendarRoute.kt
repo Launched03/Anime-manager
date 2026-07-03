@@ -93,6 +93,8 @@ fun CalendarScreen(
                     AnimeWeekdayChips(
                         selectedWeekday = uiState.selectedWeekday,
                         onSelect = { value -> value?.let(onWeekdayChange) },
+                        includeAll = false,
+                        initialVisibleWeekday = uiState.selectedWeekday,
                     )
                     Text(text = weekdayLabel(uiState.selectedWeekday))
                 }
